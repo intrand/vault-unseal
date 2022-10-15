@@ -28,33 +28,34 @@ import (
 )
 
 var (
-	version = "master"
-	commit  = "latest"
-	date    = "-"
-	builtBy = "manual"
+	version = ""
+	commit  = ""
+	date    = ""
+	builtBy = ""
 )
 
 // Config is a combo of the flags passed to the cli and the configuration file (if used).
 type Config struct {
 	Version    bool   `short:"v" long:"version" description:"display the version of vault-unseal and exit"`
-	Debug      bool   `short:"D" long:"debug" description:"enable debugging (extra logging)"`
-	ConfigPath string `env:"CONFIG_PATH" short:"c" long:"config" description:"path to configuration file" value-name:"PATH"`
+	Debug      bool   `short:"d" long:"debug" description:"enable debugging (extra logging)"`
+	ConfigPath string `env:"config_path" short:"c" long:"config" description:"path to configuration file" value-name:"PATH"`
 
 	Log struct {
-		Path   string `env:"LOG_PATH" long:"path" description:"path to log output to" value-name:"PATH"`
-		Quiet  bool   `env:"LOG_QUIET" long:"quiet" description:"disable logging to stdout (also: see levels)"`
-		Level  string `env:"LOG_LEVEL" long:"level" default:"info" choice:"debug" choice:"info" choice:"warn" choice:"error" choice:"fatal"  description:"logging level"`
-		JSON   bool   `env:"LOG_JSON" long:"json" description:"output logs in JSON format"`
-		Pretty bool   `env:"LOG_PRETTY" long:"pretty" description:"output logs in a pretty colored format (cannot be easily parsed)"`
+		Path   string `env:"log_path" long:"path" description:"path to log output to" value-name:"PATH"`
+		Quiet  bool   `env:"log_quiet" long:"quiet" description:"disable logging to stdout (also: see levels)"`
+		Level  string `env:"log_level" long:"level" default:"info" choice:"debug" choice:"info" choice:"warn" choice:"error" choice:"fatal"  description:"logging level"`
+		JSON   bool   `env:"log_json" long:"json" description:"output logs in JSON format"`
+		Pretty bool   `env:"log_pretty" long:"pretty" description:"output logs in a pretty colored format (cannot be easily parsed)"`
 	} `group:"Logging Options" namespace:"log"`
 
-	CheckInterval    time.Duration `env:"CHECK_INTERVAL" long:"check-interval" description:"frequency of sealed checks against nodes" yaml:"check_interval"`
-	MaxCheckInterval time.Duration `env:"MAX_CHECK_INTERVAL" long:"max-check-interval" description:"max time that vault-unseal will wait for an unseal check/attempt" yaml:"max_check_interval"`
+	CheckInterval    time.Duration `env:"check_interval" long:"check-interval" description:"frequency of sealed checks against nodes" yaml:"check_interval"`
+	MaxCheckInterval time.Duration `env:"max_check_interval" long:"max-check-interval" description:"max time that vault-unseal will wait for an unseal check/attempt" yaml:"max_check_interval"`
 
-	AllowSingleNode bool     `env:"ALLOW_SINGLE_NODE" long:"allow-single-node" description:"allow vault-unseal to run on a single node" yaml:"allow_single_node" hidden:"true"`
-	Nodes           []string `env:"NODES" long:"nodes" env-delim:"," description:"nodes to connect/provide tokens to (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"vault_nodes"`
-	TLSSkipVerify   bool     `env:"TLS_SKIP_VERIFY" long:"tls-skip-verify" description:"disables tls certificate validation: DO NOT DO THIS" yaml:"tls_skip_verify"`
-	Tokens          []string `env:"TOKENS" long:"tokens" env-delim:"," description:"tokens to provide to nodes (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"unseal_tokens"`
+	AllowSingleNode bool     `env:"allow_single_node" long:"allow-single-node" description:"allow vault-unseal to run on a single node" yaml:"allow_single_node" hidden:"true"`
+	Nodes           []string `env:"nodes" long:"nodes" env-delim:"," description:"nodes to connect/provide tokens to (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"vault_nodes"`
+	CaPath          string   `env:"tls_ca_path" long:"tls-ca-path" description:"path to certificate authority public tls certificate file" yaml:"tls_ca_path"`
+	TLSSkipVerify   bool     `env:"tls_skip_verify" long:"tls-skip-verify" description:"disables tls certificate validation: DO NOT DO THIS" yaml:"tls_skip_verify"`
+	Tokens          []string `env:"tokens" long:"tokens" env-delim:"," description:"tokens to provide to nodes (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"unseal_tokens"`
 
 	lastModifiedCheck time.Time
 }
@@ -75,7 +76,12 @@ func newVault(addr string) (vault *vapi.Client) {
 	vconfig.MaxRetries = 0
 	vconfig.Timeout = 15 * time.Second
 
-	if err = vconfig.ConfigureTLS(&vapi.TLSConfig{Insecure: conf.TLSSkipVerify}); err != nil {
+	hashiTlsConf := vapi.TLSConfig{
+		Insecure: conf.TLSSkipVerify,
+		CAPath:   conf.CaPath,
+	}
+
+	if err = vconfig.ConfigureTLS(&hashiTlsConf); err != nil {
 		logger.WithError(err).Fatal("error initializing tls config")
 	}
 
@@ -96,7 +102,7 @@ func main() {
 	}
 
 	if conf.Version {
-		fmt.Printf("vault-unseal version: %s [%s] (%s, %s), compiled %s\n", version, commit, runtime.GOOS, runtime.GOARCH, date)
+		fmt.Printf("vault-unseal version: %s [%s] (%s, %s), compiled %s by %s\n", version, commit, runtime.GOOS, runtime.GOARCH, date, builtBy)
 		os.Exit(0)
 	}
 
@@ -188,7 +194,7 @@ func readConfig(path string) error {
 			perms != 0o400 &&
 			perms != 0o440 &&
 			perms != 0o460 {
-			return fmt.Errorf("permissions of %q are insecure: %s, please use 0660 or 0440 or less", path, perms)
+			return fmt.Errorf("permissions of %q are insecure: %s, please use 0660 or less", path, perms)
 		}
 
 		// Check to see if it's updated.
@@ -219,7 +225,7 @@ func readConfig(path string) error {
 			return errors.New("not enough nodes in node list (must have at least 3!)")
 		}
 
-		logger.Warn("running with less than 3 nodes, this is not recommended")
+		logger.Warn("running with less than 3 nodes. this is not recommended")
 	}
 
 	if len(conf.Tokens) < 1 {
