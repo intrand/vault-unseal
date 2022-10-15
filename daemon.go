@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -45,7 +44,6 @@ func worker(ctx context.Context, wg *sync.WaitGroup, addr string) {
 			status, err := client.Sys().SealStatus()
 			if err != nil {
 				errCount++
-				nerr := fmt.Errorf("checking seal status: %v", err)
 
 				if err, ok := err.(net.Error); ok && err.Timeout() {
 					// It's a network timeout. If it's the first network timeout,
@@ -58,7 +56,6 @@ func worker(ctx context.Context, wg *sync.WaitGroup, addr string) {
 					}
 				}
 
-				notify(nerr)
 				continue
 			}
 			logger.WithFields(log.Fields{"addr": addr, "status": status}).Info("seal status")
@@ -83,14 +80,12 @@ func worker(ctx context.Context, wg *sync.WaitGroup, addr string) {
 				}).Info("using unseal token")
 				resp, err := client.Sys().Unseal(token)
 				if err != nil {
-					notify(fmt.Errorf("using unseal key %d on %v: %v", i+1, addr, err))
 					errCount++
 					continue
 				}
 
 				logger.WithField("addr", addr).Info("token successfully sent")
 				if !resp.Sealed {
-					notify(fmt.Errorf("(was sealed) %v now unsealed with tokens", addr))
 					continue
 				}
 			}

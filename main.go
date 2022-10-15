@@ -31,6 +31,7 @@ var (
 	version = "master"
 	commit  = "latest"
 	date    = "-"
+	builtBy = "manual"
 )
 
 // Config is a combo of the flags passed to the cli and the configuration file (if used).
@@ -56,21 +57,6 @@ type Config struct {
 	Nodes           []string `env:"NODES" long:"nodes" env-delim:"," description:"nodes to connect/provide tokens to (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"vault_nodes"`
 	TLSSkipVerify   bool     `env:"TLS_SKIP_VERIFY" long:"tls-skip-verify" description:"disables tls certificate validation: DO NOT DO THIS" yaml:"tls_skip_verify"`
 	Tokens          []string `env:"TOKENS" long:"tokens" env-delim:"," description:"tokens to provide to nodes (can be provided multiple times & uses comma-separated string for environment variable)" yaml:"unseal_tokens"`
-
-	NotifyMaxElapsed time.Duration `env:"NOTIFY_MAX_ELAPSED" long:"notify-max-elapsed" description:"max time before the notification can be queued before it is sent" yaml:"notify_max_elapsed"`
-	NotifyQueueDelay time.Duration `env:"NOTIFY_QUEUE_DELAY" long:"notify-queue-delay" description:"time we queue the notification to allow as many notifications to be sent in one go (e.g. if no notification within X time, send all notifications)" yaml:"notify_queue_delay"`
-
-	Email struct {
-		Enabled       bool     `env:"EMAIL_ENABLED" long:"enabled" description:"enables email support" yaml:"enabled"`
-		Hostname      string   `env:"EMAIL_HOSTNAME" long:"hostname" description:"hostname of mail server" yaml:"hostname"`
-		Port          int      `env:"EMAIL_PORT" long:"port" description:"port of mail server" yaml:"port"`
-		Username      string   `env:"EMAIL_USERNAME" long:"username" description:"username to authenticate to mail server" yaml:"username"`
-		Password      string   `env:"EMAIL_PASSWORD" long:"password" description:"password to authenticate to mail server" yaml:"password"`
-		FromAddr      string   `env:"EMAIL_FROM_ADDR" long:"from-addr" description:"address to use as 'From'" yaml:"from_addr"`
-		SendAddrs     []string `env:"EMAIL_SEND_ADDRS" long:"send-addrs" description:"addresses to send notifications to" yaml:"send_addrs"`
-		TLSSkipVerify bool     `env:"EMAIL_TLS_SKIP_VERIFY" long:"tls-skip-verify" description:"skip SMTP TLS certificate validation" yaml:"tls_skip_verify"`
-		MandatoryTLS  bool     `env:"EMAIL_MANDATORY_TLS" long:"mandatory-tls" description:"require TLS for SMTP connections. Defaults to opportunistic." yaml:"mandatory_tls"`
-	} `group:"Email Options" namespace:"email" yaml:"email"`
 
 	lastModifiedCheck time.Time
 }
@@ -169,8 +155,6 @@ func main() {
 		go worker(ctx, &wg, addr)
 	}
 
-	go notifier(ctx, &wg)
-
 	if conf.ConfigPath != "" {
 		go func() {
 			for {
@@ -242,22 +226,6 @@ func readConfig(path string) error {
 
 	if len(conf.Tokens) >= 3 {
 		logger.Warnf("found %d tokens in the config, make sure this is not a security risk", len(conf.Tokens))
-	}
-
-	if conf.Email.Enabled {
-		if len(conf.Email.SendAddrs) < 1 {
-			return errors.New("no send addresses setup for email")
-		}
-		if conf.Email.Hostname == "" || conf.Email.FromAddr == "" {
-			return errors.New("email hostname or from address is empty")
-		}
-	}
-
-	if conf.NotifyQueueDelay < 10*time.Second {
-		conf.NotifyQueueDelay = 10 * time.Second
-	}
-	if conf.NotifyQueueDelay > 10*time.Minute {
-		conf.NotifyQueueDelay = 10 * time.Minute
 	}
 
 	if path != "" {
