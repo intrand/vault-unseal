@@ -48,8 +48,6 @@ type Config struct {
 		Pretty bool   `env:"LOG_PRETTY" long:"pretty" description:"output logs in a pretty colored format (cannot be easily parsed)"`
 	} `group:"Logging Options" namespace:"log"`
 
-	Environment string `env:"ENVIRONMENT" long:"environment" description:"environment this cluster relates to (for logging)" yaml:"environment"`
-
 	CheckInterval    time.Duration `env:"CHECK_INTERVAL" long:"check-interval" description:"frequency of sealed checks against nodes" yaml:"check_interval"`
 	MaxCheckInterval time.Duration `env:"MAX_CHECK_INTERVAL" long:"max-check-interval" description:"max time that vault-unseal will wait for an unseal check/attempt" yaml:"max_check_interval"`
 
@@ -138,8 +136,7 @@ func main() {
 	}
 
 	logger = initLogger.WithFields(log.Fields{
-		"environment": conf.Environment,
-		"version":     version,
+		"version": version,
 	})
 
 	if err := readConfig(conf.ConfigPath); err != nil {
@@ -185,7 +182,7 @@ func readConfig(path string) error {
 			return err
 		}
 
-		if perms := permbits.FileMode(fi.Mode()); perms != 0o600 && perms != 0o400 {
+		if perms := permbits.FileMode(fi.Mode()); perms != 0o600 && perms != 0o640 && perms != 0o660 && perms != 0o400 && perms != 0o440 {
 			return fmt.Errorf("permissions of %q are insecure: %s, please use 0600 or 0400", path, perms)
 		}
 
