@@ -1,22 +1,23 @@
-# build image
-FROM golang:alpine as build
-WORKDIR /build
-RUN apk add --no-cache make
-COPY go.sum go.mod Makefile /build/
-RUN make go-fetch
-COPY . /build/
-RUN make
+# docker build --pull -t main:dev
+FROM golang:alpine as builder
+ARG Version
+ARG Commit
+ARG CommitDate
+ARG Builder="buildx"
+COPY . "${GOPATH}/src/package/app/"
+WORKDIR "${GOPATH}/src/package/app"
+RUN apk add --no-cache --upgrade \
+		git \
+		ca-certificates && \
+	addgroup -g 1000 app && \
+	adduser -u 100 -G app -D -g '' app && \
+	go get -d -v && \
+	CGO_ENABLED=0 go build -a -o "/go/bin/main" -ldflags "-s -w -X 'main.version=${Version}' -X 'main.commit=${Commit}' -X 'main.date=${CommitDate}' -X 'main.builtBy=${Builder}'";
 
-# runtime image
-FROM alpine:latest
-RUN apk add --no-cache ca-certificates
-# set up nsswitch.conf for Go's "netgo" implementation
-# - https://github.com/docker-library/golang/blob/1eb096131592bcbc90aa3b97471811c798a93573/1.14/alpine3.12/Dockerfile#L9
-RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf
-COPY --from=build /build/vault-unseal /usr/local/bin/vault-unseal
-
-# runtime params
-WORKDIR /
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ENV LOG_JSON=true
-CMD ["vault-unseal"]
+FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /go/bin/main /go/bin/main
+USER app
+WORKDIR "/go/bin"
+ENTRYPOINT ["/go/bin/main"]
