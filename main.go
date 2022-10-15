@@ -182,8 +182,13 @@ func readConfig(path string) error {
 			return err
 		}
 
-		if perms := permbits.FileMode(fi.Mode()); perms != 0o600 && perms != 0o640 && perms != 0o660 && perms != 0o400 && perms != 0o440 {
-			return fmt.Errorf("permissions of %q are insecure: %s, please use 0600 or 0400", path, perms)
+		if perms := permbits.FileMode(fi.Mode()); perms != 0o600 &&
+			perms != 0o640 &&
+			perms != 0o660 &&
+			perms != 0o400 &&
+			perms != 0o440 &&
+			perms != 0o460 {
+			return fmt.Errorf("permissions of %q are insecure: %s, please use 0660 or 0440 or less", path, perms)
 		}
 
 		// Check to see if it's updated.
