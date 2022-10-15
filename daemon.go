@@ -43,6 +43,7 @@ func worker(ctx context.Context, wg *sync.WaitGroup, addr string) {
 
 			status, err := client.Sys().SealStatus()
 			if err != nil {
+				log.Error(err.Error())
 				errCount++
 
 				if err, ok := err.(net.Error); ok && err.Timeout() {
@@ -80,6 +81,7 @@ func worker(ctx context.Context, wg *sync.WaitGroup, addr string) {
 				}).Info("using unseal token")
 				resp, err := client.Sys().Unseal(token)
 				if err != nil {
+					log.Error(err.Error())
 					errCount++
 					continue
 				}
