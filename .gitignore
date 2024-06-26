@@ -7,6 +7,6 @@ dist
 *.test
 *.prof
 *.conf
-vault-unseal
+/vault-unseal*
 **/.env
 **/bin/**
